@@ -26,8 +26,10 @@ from keyboards import (
 from services.food import FoodAPI
 from services.weather import get_temp_for_city, AVG_TEMP_RUSSIA
 
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN не найден в переменных окружения!")
 bot = Bot(BOT_TOKEN)
-dp = Dispatcher()
 
 reader = BarCodeReader()
 
