@@ -1,16 +1,15 @@
 import asyncio
 from datetime import datetime
 from io import BytesIO
-
 import sys
 import logging
 import json
 import os
+import atexit
 
 import matplotlib.pyplot as plt
 import numpy as np
 from pyzxing import BarCodeReader
-import atexit
 
 from aiogram import Bot, Dispatcher, F, BaseMiddleware
 from aiogram.types import Message, CallbackQuery, ContentType
@@ -25,10 +24,6 @@ from keyboards import (
 from services.food import FoodAPI
 from services.weather import get_temp_for_city, AVG_TEMP_RUSSIA
 
-import os
-from aiogram import Bot, Dispatcher
-
-import os
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не найден!")
@@ -41,7 +36,6 @@ dp = Dispatcher()
 sys.stdout.reconfigure(line_buffering=True)
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
 
-from aiogram import BaseMiddleware, Message
 class LoggingMiddleware(BaseMiddleware):
     async def __call__(self, handler, event, data):
         if isinstance(event, Message):
