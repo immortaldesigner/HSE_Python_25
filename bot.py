@@ -1,8 +1,20 @@
 import asyncio
-from aiogram import Bot, Dispatcher, F
+from datetime import datetime
+from io import BytesIO
+
+import sys
+import logging
+
+import matplotlib.pyplot as plt
+import cv2
+import numpy as np
+from pyzxing import BarCodeReader
+
+from aiogram import Bot, Dispatcher, F, BaseMiddleware
 from aiogram.types import Message, CallbackQuery, ContentType
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter, CommandStart
+
 from config import BOT_TOKEN
 from states import ProfileForm, FoodForm, WaterForm, WorkoutForm
 from keyboards import (
@@ -13,18 +25,28 @@ from storage import users
 from services.food import FoodAPI
 from services.weather import get_temp_for_city, AVG_TEMP_RUSSIA
 
-import matplotlib.pyplot as plt
-from io import BytesIO
-import cv2
-import numpy as np
-from pyzxing import BarCodeReader
-
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
 
 reader = BarCodeReader()
 
 # ПОЛЯ ПРОФИЛЯ
+
+# Логирование
+sys.stdout.reconfigure(line_buffering=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(message)s',
+)
+
+class LoggingMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event, data):
+        if isinstance(event, Message):
+            logging.info(f"user={event.from_user.id} text={event.text}")
+        return await handler(event, data)
+
+dp.message.middleware(LoggingMiddleware())
 
 FIELD_DESCRIPTIONS = {
     "weight": "⚖ Вес (кг)\nВведите ваш вес в килограммах.\nНапример: 75",
@@ -124,16 +146,37 @@ async def done(callback: CallbackQuery):
 @dp.callback_query(F.data == "menu_profile")
 async def menu_profile(callback: CallbackQuery):
     user_id = callback.from_user.id
-    users.setdefault(user_id, {"weight": None, "height": None, "age": None,
-                                "activity": None, "city": None, "profile_msg_id": None})
+    # Создаём словарь пользователя, если ещё нет
+    users.setdefault(user_id, {
+        "weight": None, "height": None, "age": None,
+        "activity": None, "city": None, "profile_msg_id": None
+    })
+
     profile_msg_id = users[user_id].get("profile_msg_id")
+
     if profile_msg_id:
-        try: await callback.message.edit_text("📋 Ваш профиль:", reply_markup=profile_kb(users[user_id]))
-        except: 
-            msg = await callback.message.answer("📋 Ваш профиль:", reply_markup=profile_kb(users[user_id]))
+        try:
+            # Пытаемся отредактировать старое сообщение
+            await callback.message.bot.edit_message_text(
+                chat_id=callback.message.chat.id,
+                message_id=profile_msg_id,
+                text="📋 Ваш профиль:",
+                reply_markup=profile_kb(users[user_id])
+            )
+        except Exception as e:
+            # Если не удалось — отправляем новое сообщение и обновляем ID
+            logging.warning(f"Cannot edit message {profile_msg_id}: {e}")
+            msg = await callback.message.answer(
+                "📋 Ваш профиль:",
+                reply_markup=profile_kb(users[user_id])
+            )
             users[user_id]["profile_msg_id"] = msg.message_id
     else:
-        msg = await callback.message.answer("📋 Ваш профиль:", reply_markup=profile_kb(users[user_id]))
+        # Если старого сообщения нет — отправляем новое
+        msg = await callback.message.answer(
+            "📋 Ваш профиль:",
+            reply_markup=profile_kb(users[user_id])
+        )
         users[user_id]["profile_msg_id"] = msg.message_id
 
 # ЕДА
