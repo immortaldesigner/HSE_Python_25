@@ -4,11 +4,13 @@ from io import BytesIO
 
 import sys
 import logging
+import json
+import os
 
 import matplotlib.pyplot as plt
-import cv2
 import numpy as np
 from pyzxing import BarCodeReader
+import atexit
 
 from aiogram import Bot, Dispatcher, F, BaseMiddleware
 from aiogram.types import Message, CallbackQuery, ContentType
@@ -21,7 +23,6 @@ from keyboards import (
     start_kb, profile_kb, main_menu, water_menu_kb, food_menu,
     workout_menu, workout_type_menu, goal_menu
 )
-from storage import users
 from services.food import FoodAPI
 from services.weather import get_temp_for_city, AVG_TEMP_RUSSIA
 
@@ -30,7 +31,6 @@ dp = Dispatcher()
 
 reader = BarCodeReader()
 
-# ПОЛЯ ПРОФИЛЯ
 
 # Логирование
 sys.stdout.reconfigure(line_buffering=True)
@@ -48,6 +48,25 @@ class LoggingMiddleware(BaseMiddleware):
 
 dp.message.middleware(LoggingMiddleware())
 
+# === ХРАНЕНИЕ ДАННЫХ ===
+
+users = {}
+
+def save_users():
+    with open("users.json", "w", encoding="utf-8") as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+def load_users():
+    global users
+    if os.path.exists("users.json"):
+        with open("users.json", "r", encoding="utf-8") as f:
+            users = json.load(f)
+    else:
+        users = {}
+
+
+
+# ПОЛЯ ПРОФИЛЯ
 FIELD_DESCRIPTIONS = {
     "weight": "⚖ Вес (кг)\nВведите ваш вес в килограммах.\nНапример: 75",
     "height": "📏 Рост (см)\nВведите ваш рост в сантиметрах.\nНапример: 180",
@@ -97,6 +116,7 @@ async def save_value(message: Message, state: FSMContext):
     user_id = message.from_user.id
     data = await state.get_data()
     field = data["edit_field"]
+
     value = message.text.strip()
     users.setdefault(user_id, {"weight": None, "height": None, "age": None,
                                 "activity": None, "city": None,
@@ -129,6 +149,7 @@ async def save_value(message: Message, state: FSMContext):
 
     await state.update_data(error_messages=[], error_user_messages=[])
     users[user_id][field] = value
+    save_users() 
     await message.bot.edit_message_text(
         chat_id=message.chat.id,
         message_id=users[user_id]["profile_msg_id"],
@@ -512,6 +533,10 @@ async def menu_stub(callback: CallbackQuery):
 
 async def main():
     await dp.start_polling(bot)
+
+
+load_users()
+atexit.register(save_users)
 
 if __name__ == "__main__":
     asyncio.run(main())
