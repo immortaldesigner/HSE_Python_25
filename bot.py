@@ -17,7 +17,6 @@ from aiogram.types import Message, CallbackQuery, ContentType
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter, CommandStart
 
-from config import BOT_TOKEN
 from states import ProfileForm, FoodForm, WaterForm, WorkoutForm
 from keyboards import (
     start_kb, profile_kb, main_menu, water_menu_kb, food_menu,
@@ -26,22 +25,23 @@ from keyboards import (
 from services.food import FoodAPI
 from services.weather import get_temp_for_city, AVG_TEMP_RUSSIA
 
+import os
+from aiogram import Bot, Dispatcher
+
+import os
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN не найден в переменных окружения!")
+    raise ValueError("BOT_TOKEN не найден!")
+
 bot = Bot(BOT_TOKEN)
 
-reader = BarCodeReader()
-
+dp = Dispatcher()
 
 # Логирование
 sys.stdout.reconfigure(line_buffering=True)
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(message)s',
-)
-
+from aiogram import BaseMiddleware, Message
 class LoggingMiddleware(BaseMiddleware):
     async def __call__(self, handler, event, data):
         if isinstance(event, Message):
@@ -531,14 +531,13 @@ async def back_to_menu(callback: CallbackQuery):
 async def menu_stub(callback: CallbackQuery):
     await callback.message.answer(f"👉 {callback.data.replace('menu_','').upper()} (в разработке)")
 
-
+reader = None
 
 async def main():
+    global reader
+    reader = BarCodeReader()
     await dp.start_polling(bot)
 
-
-load_users()
-atexit.register(save_users)
-
 if __name__ == "__main__":
+    import asyncio
     asyncio.run(main())
