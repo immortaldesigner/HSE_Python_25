@@ -11,6 +11,9 @@ from app.models.link import Link, LinkClick
 from app.schemas.link import LinkCreate, LinkUpdate
 from app.services.security import get_current_user, get_current_user_optional, generate_short_code
 from app.services.limiter import rate_limit_user
+from app.models.user import User
+from app.schemas.user import UserCreate
+from app.services.security import hash_password
 
 router = APIRouter()
 
@@ -26,6 +29,20 @@ async def log_click_task(link_id: int, ip: str, ua: str, db_session_factory):
         db.commit()
     finally:
         db.close()
+
+@router.post("/register", status_code=201)
+async def register(data: UserCreate, db: Session = Depends(get_db)):
+    if db.query(User).filter(User.username == data.username).first():
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    new_user = User(
+        username=data.username,
+        password=hash_password(data.password)
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"message": "User created", "username": new_user.username}
 
 
 

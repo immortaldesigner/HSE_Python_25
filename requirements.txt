@@ -19,3 +19,13 @@ qrcode
 pillow
 
 httpx
+
+# testing
+
+pytest
+pytest-cov
+pytest-asyncio
+pytest-mock
+pytest-env
+httpx
+locust
